@@ -226,13 +226,13 @@ def run_try() -> None:
         _commit(proposed_change[:70])
         _write(opt_journal, f"{journal_existing}- **{date.today().isoformat()}** Kept '{proposed_change[:60]}...' "
                f"(visible={visible_score:.2f}, hidden={'N/A' if hidden_score is None else f'{hidden_score:.2f}'})\n")
-        print("Decision: KEEP ✔")
+        print("Decision: KEEP [yes]")
         print("Committed to git.")
     else:
         _write(claudemd, original_claude_md)
         _write(opt_journal, f"{journal_existing}- **{date.today().isoformat()}** Dropped '{proposed_change[:60]}...' "
                f"(visible={visible_score:.2f}, hidden={'N/A' if hidden_score is None else f'{hidden_score:.2f}'})\n")
-        print("Decision: DROP ✘")
+        print("Decision: DROP [no]")
         print("Restored harness/CLAUDE.md.")
 
 

@@ -1,0 +1,7 @@
+traces/
+links.txt
+verifier/links.csv
+verifier/hidden_links.csv
+.claude/
+__pycache__/
+.env
