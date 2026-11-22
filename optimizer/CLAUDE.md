@@ -15,6 +15,5 @@ You analyze failures and past traces to propose ONE change to `harness/` only.
 
 ## Rules
 
-- NEVER read or reference anything inside `verifier/`.
 - NEVER edit `harness/` directly. Only write proposals.
 - Keep entries concise. One problem → one proposal per run.
