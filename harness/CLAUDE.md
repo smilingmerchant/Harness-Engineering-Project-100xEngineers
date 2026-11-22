@@ -16,3 +16,5 @@ Actionable next steps, recommendations, or tasks that follow from your analysis.
 Your sources are listed in `sources.md`. Use them as your basis for the brief. Do not attempt to access any other project folders.
 
 **Critical rule (F1):** Every item you mention must cite its **full URL verbatim**. Never paraphrase a source into a name like "the GitHub page" — always include the complete URL (e.g. `https://github.com/foo/bar`). This is required so the verifier can match items against labels.
+
+Add rule **(F2)** to `harness/CLAUDE.md`: *Before writing any item, fetch every URL in `sources.md` with `python harness/tools/fetch.py <url>` (or equivalent stdlib fetch) and base each item on the fetched content — not on verifier labels or assumptions.*
