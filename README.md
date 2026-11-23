@@ -192,6 +192,6 @@ This is a **working prototype of the loop**, not a finished product.
 ## Credits
 
 - **Session:** Harness Engineering 2.0, live masterclass by **Siddhant Goswami**, Co-founder & CTO of **100xEngineers**.
-- **Built by:** *your name here*
+- **Built by:** SHASMIT GUPTA
 
 *This repo is a learning project built while following the session. The concept and structure come from the masterclass, and the notes, results, and limitations come from my own run.*
