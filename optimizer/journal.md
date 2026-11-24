@@ -6,3 +6,5 @@
 - **2026-11-24** Dropped 'Revise rule **(F2)** in `harness/CLAUDE.md` to read: *Before...' (visible=0.00, hidden=N/A)
 - **2026-11-24** Proposed: RULE_ID: F2
 RULE_TEXT: (F2) Use the content under '## Fetched pages' (already included above) to write all brief items; do not attempt to re-fetch any URL.
+- **2026-11-24** Kept 'RULE_ID: F2
+RULE_TEXT: (F2) Use the content under '## Fetche...' (visible=0.12, hidden=N/A)

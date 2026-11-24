@@ -18,6 +18,3 @@ Your sources are listed in `sources.md`. Use them as your basis for the brief. D
 **Critical rule (F1):** Every item in the brief must cite its full URL exactly as written in links.txt, because the reader needs to open it. (F1)
 
 (F2) Base every item only on the text under '## Fetched pages'; if a page says FETCH FAILED, say it could not be read and do not invent its content.
-
-RULE_ID: F2
-RULE_TEXT: (F2) Use the content under '## Fetched pages' (already included above) to write all brief items; do not attempt to re-fetch any URL.
