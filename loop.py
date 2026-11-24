@@ -147,9 +147,9 @@ def run_optimize() -> None:
         f"{failures_md}\n\n"
         "## Recent traces\n"
         f"{traces_info}\n\n"
-        "Respond with exactly two sections:\n"
+        "Respond with exactly two sections using these exact headings, filling each:\n"
         "# Proposal\n"
-        "<one-line description of ONE change to harness/CLAUDE.md>\n\n"
+        "<the rule text itself, exactly as it should appear in harness/CLAUDE.md>\n\n"
         "# Rationale\n"
         "<one sentence explaining why this addresses an open failure>\n"
     )
@@ -169,6 +169,10 @@ def run_optimize() -> None:
     rat_match = re.search(r"# Rationale\s*\n(.*?)(?:\n\n|$)", raw, re.DOTALL)
     proposal_text = (prop_match.group(1).strip() if prop_match else "").replace("# Proposal", "").strip()
     rationale_text = rat_match.group(1).strip() if rat_match else ""
+
+    if not proposal_text or not rationale_text:
+        print(f"ERROR: optimizer returned empty response.\nRAW OUTPUT:\n{raw}")
+        sys.exit(1)
 
     opt_proposals = OPTIMIZER / "proposals.md"
     existing = opt_proposals.read_text(encoding="utf-8").rstrip() + "\n" if opt_proposals.exists() else ""
@@ -201,7 +205,7 @@ def run_try() -> None:
         last_match = matches[-1]
         proposal_block = proposals_content[last_match.start():].split("\n\n## [")[0]
 
-    prop_match = re.search(r"# Proposal\s*\n(.*?)(?:\n\n|$)", proposal_block, re.DOTALL)
+    prop_match = re.search(r"^## \[\d{4}-\d{2}-\d{2}\]\s*\n(.*?)\n\n\*\*Rationale:\*\*", proposal_block, re.DOTALL)
     proposed_change = prop_match.group(1).strip() if prop_match else ""
 
     if not proposed_change:
