@@ -42,13 +42,12 @@ def score(brief_path: str, decisions_path: str, links_csv_path: str) -> float:
         if url.lower() in brief_text:
             matters_hit += 1
 
-    # For simplicity, assume decisions are called correctly if present
-    # (In practice, you'd parse the brief for decision calls)
-    decisions_correct = sum(1 for _, ra in decisions if ra)
+    # A decision counts as correct only if its right answer appears in the brief
+    decisions_correct = sum(1 for _, ra in decisions if ra and ra.lower() in brief_text)
 
-    # Noise items (non-mattered, non-empty labels)
+    # Noise items (non-mattered, non-empty, non-maybe labels)
     noise_items = [row["url"] for row in csv.DictReader(open(links_csv_path, newline="", encoding="utf-8"))
-                   if row.get("label") not in ("mattered", "")]
+                   if row.get("label") not in ("mattered", "", "maybe")]
     noise_called = sum(1 for url in noise_items if url.lower() in brief_text)
 
     numerator = (matters_hit * 1) + (decisions_correct * 2) - (noise_called * 0.5)

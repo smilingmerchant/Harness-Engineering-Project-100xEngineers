@@ -7,7 +7,6 @@ Subcommands:
     py loop.py try              Apply the latest proposal and evaluate it.
                                 Runs: brief (claude -p #2), optional hidden check.
 """
-import csv
 import json
 import re
 import subprocess
@@ -21,6 +20,9 @@ VERIFIER = BASE / "verifier"
 TRACES = BASE / "traces" / "try"
 OPTIMIZER = BASE / "optimizer"
 
+# Added to sys.path so we can import from verifier package
+sys.path.insert(0, str(BASE))
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -32,37 +34,14 @@ def _write(path: Path, text: str) -> None:
 
 
 def _score(brief_path: Path, links_csv: Path, decisions_csv: Path) -> float:
-    mattered_links = []
-    noise_items = []
-    with open(links_csv, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            label = row.get("label", "").strip()
-            url = row["url"]
-            if label == "mattered":
-                mattered_links.append(url)
-            elif label not in ("", "maybe"):
-                noise_items.append(url)
-
-    decisions = []
-    with open(decisions_csv, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            decision = row.get("decision", "").strip()
-            right_answer = row.get("right_answer", "").strip()
-            if decision:
-                decisions.append((decision, right_answer))
-
-    brief_text = _read(brief_path).lower()
-    matters_hit = sum(1 for u in mattered_links if u.lower() in brief_text)
-    decisions_correct = sum(1 for _, ra in decisions if ra)
-    noise_called = sum(1 for u in noise_items if u.lower() in brief_text)
-
-    numerator = (matters_hit * 1) + (decisions_correct * 2) - (noise_called * 0.5)
-    denominator = len(mattered_links) + 2 * len(decisions)
-    return numerator / denominator if denominator else 0.0
+    """Score using verifier/score.py; treats 'maybe' as neutral."""
+    from verifier.score import score
+    return score(str(brief_path), str(decisions_csv), str(links_csv))
 
 
 def _count_mattered(csv_path: Path) -> int:
     count = 0
+    import csv
     with open(csv_path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             if row.get("label", "").strip() == "mattered":
@@ -74,6 +53,30 @@ def _commit(msg: str) -> None:
     subprocess.run(["git", "add", "-A"], cwd=BASE, capture_output=True, text=True)
     subprocess.run(["git", "commit", "--no-verify", "-m", msg],
                    cwd=BASE, capture_output=True, text=True)
+
+
+def _load_best_score() -> tuple[float | None, float | None]:
+    """Load best scores from optimizer/best_score.json or compute initial baseline."""
+    best_path = OPTIMIZER / "best_score.json"
+    if best_path.exists():
+        data = json.loads(best_path.read_text(encoding="utf-8"))
+        return data.get("visible"), data.get("hidden")
+    # No saved best — score current brief as initial baseline
+    brief_path = TRACES / "brief.md"
+    if not brief_path.exists():
+        return None, None
+    visible = _score(brief_path, VERIFIER / "links.csv", VERIFIER / "decisions.csv")
+    hidden = None
+    if _count_mattered(VERIFIER / "hidden_links.csv") > 0:
+        hidden = _score(brief_path, VERIFIER / "hidden_links.csv", VERIFIER / "decisions.csv")
+    _write(best_path, json.dumps({"visible": visible, "hidden": hidden}, indent=2))
+    return visible, hidden
+
+
+def _save_best_score(visible: float, hidden: float | None) -> None:
+    _write(OPTIMIZER / "best_score.json", json.dumps({
+        "visible": visible, "hidden": hidden
+    }, indent=2))
 
 
 # ── brief ────────────────────────────────────────────────────────────────────
@@ -100,8 +103,15 @@ def run_brief(run_id: str) -> None:
         "## What to do\n"
     )
 
-    result = subprocess.run(["claude", "-p", prompt],
-                            capture_output=True, text=True, check=True)
+    try:
+        result = subprocess.run(["claude", "-p", prompt],
+                                capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: claude command failed (exit {e.returncode})", file=sys.stderr)
+        print(f"STDERR:\n{e.stderr}", file=sys.stderr)
+        print(f"STDOUT:\n{e.stdout}", file=sys.stderr)
+        sys.exit(1)
+
     brief_output = result.stdout.strip()
 
     TRACES.mkdir(parents=True, exist_ok=True)
@@ -144,8 +154,15 @@ def run_optimize() -> None:
         "<one sentence explaining why this addresses an open failure>\n"
     )
 
-    result = subprocess.run(["claude", "-p", prompt],
-                            capture_output=True, text=True, check=True)
+    try:
+        result = subprocess.run(["claude", "-p", prompt],
+                                capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: claude command failed (exit {e.returncode})", file=sys.stderr)
+        print(f"STDERR:\n{e.stderr}", file=sys.stderr)
+        print(f"STDOUT:\n{e.stdout}", file=sys.stderr)
+        sys.exit(1)
+
     raw = result.stdout.strip()
 
     prop_match = re.search(r"# Proposal\s*\n(.*?)(?:\n\n|$)", raw, re.DOTALL)
@@ -215,19 +232,27 @@ def run_try() -> None:
     else:
         print("Hidden set skipped: no mattered links defined.")
 
-    keep = visible_score > 0
-    if hidden_score is not None and hidden_score < 0:
-        keep = False
+    # FIX 2: Load previous best scores
+    prev_visible, prev_hidden = _load_best_score()
+    print(f"Previous best: visible={prev_visible:.2f if prev_visible is not None else 'N/A'}, "
+          f"hidden={'N/A' if prev_hidden is None else f'{prev_hidden:.2f}'}")
+
+    # FIX 2: Keep only if strictly better than best so far
+    keep = False
+    if prev_visible is None or visible_score > prev_visible:
+        if prev_hidden is None or (hidden_score is not None and hidden_score >= prev_hidden):
+            keep = True
 
     opt_journal = OPTIMIZER / "journal.md"
     journal_existing = opt_journal.read_text(encoding="utf-8").rstrip() + "\n" if opt_journal.exists() else ""
 
     if keep:
         _commit(proposed_change[:70])
+        _save_best_score(visible_score, hidden_score)
         _write(opt_journal, f"{journal_existing}- **{date.today().isoformat()}** Kept '{proposed_change[:60]}...' "
                f"(visible={visible_score:.2f}, hidden={'N/A' if hidden_score is None else f'{hidden_score:.2f}'})\n")
         print("Decision: KEEP [yes]")
-        print("Committed to git.")
+        print("Committed to git. Best scores updated.")
     else:
         _write(claudemd, original_claude_md)
         _write(opt_journal, f"{journal_existing}- **{date.today().isoformat()}** Dropped '{proposed_change[:60]}...' "

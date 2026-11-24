@@ -17,4 +17,4 @@ Your sources are listed in `sources.md`. Use them as your basis for the brief. D
 
 **Critical rule (F1):** Every item in the brief must cite its full URL exactly as written in links.txt, because the reader needs to open it. (F1)
 
-Add rule **(F2)** to `harness/CLAUDE.md`: *Before writing about a link, fetch it with tools/fetch.py and base the item on what the page says. (F2)*
+(F2) Before writing about a link, fetch it and base the item on what the page says.
