@@ -135,31 +135,32 @@ def _build_fetched_section(cache: dict[str, str]) -> str:
 
 
 def _parse_proposal(raw: str) -> tuple[str | None, str | None]:
-    """Parse optimizer output into (rule_id, rule_text).
+    """Parse proposal text into (rule_id, rule_text).
 
-    Expects inside '# Proposal':
+    Expects anywhere inside *raw*:
         RULE_ID: F2   (or NEW)
         RULE_TEXT: <the rule exactly as it should appear in CLAUDE.md>
 
-    Tolerates bold (**), backticks, blank lines.
+    Tolerates bold (**), backticks, blank lines, Windows line endings,
+    and a stray closing ``` line at the end.
     Returns (None, None) on parse failure.
     """
-    prop_match = re.search(r"# Proposal\s*\n(.*?)(?:\n\n# Rationale|\Z)", raw, re.DOTALL)
-    if not prop_match:
-        return None, None
-    block = prop_match.group(1)
+    # Normalize line endings and strip stray ``` fence lines early
+    raw = raw.replace("\r\n", "\n").replace("\r", "\n")
 
-    rid_match = re.search(r"RULE_ID\s*:\s*(.+)", block)
-    rt_match = re.search(r"RULE_TEXT\s*:\s*(.+)", block)
+    rid_match = re.search(r"RULE_ID\s*:\s*(.+)", raw)
+    rt_match = re.search(r"RULE_TEXT\s*:\s*(.+)", raw)
     if not rid_match or not rt_match:
         return None, None
 
-    rule_id = re.sub(r"\*", "", rid_match.group(1).strip())
-    # Strip markdown formatting from rule text
+    rule_id = rid_match.group(1).strip()
+    rule_id = re.sub(r"\*+", "", rule_id)
+
     rule_text = rt_match.group(1).strip()
-    rule_text = re.sub(r"\*\*", "", rule_text)   # remove bold markers
-    rule_text = re.sub(r"`", "", rule_text)       # remove backticks
-    rule_text = rule_text.strip()
+    rule_text = rule_text.replace("**", "")
+    rule_text = rule_text.replace("`", "")
+    lines = [l for l in rule_text.splitlines() if l.strip() != "```"]
+    rule_text = "\n".join(lines).strip()
 
     return rule_id, rule_text
 
@@ -398,16 +399,20 @@ def run_try() -> None:
             hidden_score = _score(TRACES / "brief.md", hidden_csv, VERIFIER / "decisions.csv")
             print(f"Hidden score (after apply): {hidden_score:.2f}")
 
-        # Task 7: Keep only if strictly better
+        # Keep only if visible improves AND hidden doesn't drop (when hidden set exists)
+        has_hidden_set = _count_mattered(hidden_csv) > 0
         if prev_visible is None or visible_score > prev_visible:
-            if prev_hidden is None or (hidden_score is not None and hidden_score >= prev_hidden):
+            if not has_hidden_set:
+                # No hidden set: keep based on visible alone (existing behavior)
+                keep = True
+            elif hidden_score is not None and (prev_hidden is None or hidden_score >= prev_hidden):
                 keep = True
 
         opt_journal = OPTIMIZER / "journal.md"
         journal_existing = opt_journal.read_text(encoding="utf-8").rstrip() + "\n" if opt_journal.exists() else ""
 
         if keep:
-            _commit(proposed_change[:70])
+            _commit((rule_text or proposed_change)[:70])
             _save_best_score(visible_score, hidden_score)
             h_str = "N/A" if hidden_score is None else f"{hidden_score:.2f}"
             v_str = f"{visible_score:.2f}"
