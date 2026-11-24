@@ -10,3 +10,10 @@ F2 is the current top priority in `FAILURES.md`; the trace confirms all 12 sourc
 Revise rule **(F2)** in `harness/CLAUDE.md` to read: *Before writing any item, you MUST fetch every URL in `sources.md` using `python harness/tools/fetch.py <url>` as your primary method; do NOT attempt raw curl, Invoke-WebRequest, or direct stdlib calls.*
 
 **Rationale:** The current `(F2)` rule includes "(or equivalent stdlib fetch)" which the latest trace (`traces/try/brief.md`) interprets as permission to bypass `fetch.py` entirely â€” the agent tried raw PowerShell/WebFetch instead, hit permission blocks, and produced a brief with zero fetched content. Removing the alternative makes `fetch.py` the mandatory path.
+## [2026-11-24]
+
+RULE_ID: F2
+RULE_TEXT: (F2) Use the content under '## Fetched pages' (already included above) to write all brief items; do not attempt to re-fetch any URL.
+
+**Rationale:** The loop already pre-fetches every source and injects it into the prompt. The agent ignores this and tries to fetch again, hitting permission prompts and producing empty briefs. Telling it explicitly to use the injected section eliminates redundant work and the associated failures.
+```
