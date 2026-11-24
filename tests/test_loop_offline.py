@@ -1,5 +1,6 @@
 """Offline self-test for loop.py — mocks subprocess, no real network calls."""
 import csv
+import hashlib
 import json
 import sys
 import tempfile
@@ -9,6 +10,15 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 import loop
+
+
+def _hash_dir(path: Path) -> str:
+    """Hash all files under *path* in sorted order; returns sha256 hex."""
+    h = hashlib.sha256()
+    for f in sorted(path.rglob("*")):
+        if f.is_file():
+            h.update(f.read_bytes())
+    return h.hexdigest()
 
 
 def _mkcsv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -274,6 +284,42 @@ def test_subprocess_prompt_via_stdin_not_argv():
         assert "test" not in part, f"Prompt leaked into command arg: {captured['cmd']}"
 
 
+def test_no_test_isolation_leak() -> None:
+    """Every test must leave traces/try, optimizer/ and harness/CLAUDE.md byte-for-byte intact."""
+    before_traces = _hash_dir(PROJECT_ROOT / "traces")
+    before_optimizer = _hash_dir(PROJECT_ROOT / "optimizer")
+    claudemd_before = (PROJECT_ROOT / "harness" / "CLAUDE.md").read_text(encoding="utf-8")
+
+    # Re-run the full test suite inside this process so any writes from every test surface here.
+    import importlib
+    importlib.reload(loop)
+    tests = [
+        ("proposal clean", test_proposal_parsing_clean),
+        ("proposal bold/backtick", test_proposal_parsing_bold_backtick),
+        ("proposal malformed", test_proposal_parsing_malformed),
+        ("replace vs append", test_apply_rule_replaces_existing),
+        ("restore after crash", test_restore_after_crash),
+        ("restore after drop", test_restore_after_drop),
+        ("fstring none", test_fstring_no_valueerror_none),
+        ("fstring floats", test_fstring_no_valueerror_floats),
+        ("scoring empty", test_scoring_empty),
+        ("scoring links-only", test_scoring_links_only),
+        ("scoring noise-only", test_scoring_noise_only),
+        ("scoring perfect", test_scoring_perfect),
+        ("subprocess stdin", test_subprocess_prompt_via_stdin_not_argv),
+    ]
+    for name, fn in tests:
+        fn()
+
+    after_traces = _hash_dir(PROJECT_ROOT / "traces")
+    after_optimizer = _hash_dir(PROJECT_ROOT / "optimizer")
+    claudemd_after = (PROJECT_ROOT / "harness" / "CLAUDE.md").read_text(encoding="utf-8")
+
+    assert after_traces == before_traces, "traces/ mutated by a test"
+    assert after_optimizer == before_optimizer, "optimizer/ mutated by a test"
+    assert claudemd_after == claudemd_before, "harness/CLAUDE.md mutated by a test"
+
+
 # ── main runner ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -292,6 +338,7 @@ if __name__ == "__main__":
         ("scoring noise-only", test_scoring_noise_only),
         ("scoring perfect", test_scoring_perfect),
         ("subprocess stdin", test_subprocess_prompt_via_stdin_not_argv),
+        ("no test isolation leak", test_no_test_isolation_leak),
     ]
 
     failed = []
