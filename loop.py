@@ -219,8 +219,9 @@ def run_brief(run_id: str) -> None:
     print(f"Running claude -p brief (can take up to 10 minutes)")
     t0 = time.time()
     try:
-        result = subprocess.run(["claude", "-p", prompt],
-                                capture_output=True, text=True, check=True,
+        result = subprocess.run(["claude", "-p"],
+                                input=prompt, capture_output=True, text=True,
+                                encoding="utf-8", check=True,
                                 timeout=900)
     except subprocess.TimeoutExpired:
         print("ERROR: claude -p timed out after 900 seconds (10 minutes).", file=sys.stderr)
@@ -282,8 +283,9 @@ def run_optimize() -> None:
     print(f"Running claude -p optimize (can take up to 10 minutes)")
     t0 = time.time()
     try:
-        result = subprocess.run(["claude", "-p", prompt],
-                                capture_output=True, text=True, check=True,
+        result = subprocess.run(["claude", "-p"],
+                                input=prompt, capture_output=True, text=True,
+                                encoding="utf-8", check=True,
                                 timeout=900)
     except subprocess.TimeoutExpired:
         print("ERROR: claude -p timed out after 900 seconds (10 minutes).", file=sys.stderr)

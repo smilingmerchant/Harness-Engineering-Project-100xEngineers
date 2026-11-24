@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+import loop
 
 
 def _mkcsv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -249,6 +250,30 @@ def test_scoring_perfect():
     _test_scoring(1.00, brief, project, "perfect")
 
 
+def test_subprocess_prompt_via_stdin_not_argv():
+    """Prompt must be passed through input= (stdin), not as a CLI arg."""
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["input"] = kwargs.get("input")
+        class MockResult:
+            stdout = "brief output"
+            stderr = ""
+        return MockResult()
+
+    with patch("loop.subprocess.run", side_effect=fake_run):
+        loop.run_brief("test-run")
+
+    assert captured["cmd"] == ["claude", "-p"], \
+        f"Expected ['claude', '-p'], got {captured['cmd']}"
+    assert "test" in captured["input"], \
+        "Prompt should be in input=, not in command list"
+    # Explicitly verify the prompt text is NOT anywhere in the command list
+    for part in captured["cmd"]:
+        assert "test" not in part, f"Prompt leaked into command arg: {captured['cmd']}"
+
+
 # ── main runner ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -266,6 +291,7 @@ if __name__ == "__main__":
         ("scoring links-only", test_scoring_links_only),
         ("scoring noise-only", test_scoring_noise_only),
         ("scoring perfect", test_scoring_perfect),
+        ("subprocess stdin", test_subprocess_prompt_via_stdin_not_argv),
     ]
 
     failed = []
