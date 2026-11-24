@@ -237,9 +237,9 @@ def run_try() -> None:
         print("Hidden set skipped: no mattered links defined.")
 
     # FIX 2: Load previous best scores
-    prev_visible, prev_hidden = _load_best_score()
-    print(f"Previous best: visible={prev_visible:.2f if prev_visible is not None else 'N/A'}, "
-          f"hidden={'N/A' if prev_hidden is None else f'{prev_hidden:.2f}'}")
+    pv = f"{prev_visible:.2f}" if prev_visible is not None else "N/A"
+    ph = f"{prev_hidden:.2f}" if prev_hidden is not None else "N/A"
+    print(f"Previous best: visible={pv}, hidden={ph}")
 
     # FIX 2: Keep only if strictly better than best so far
     keep = False
@@ -253,14 +253,16 @@ def run_try() -> None:
     if keep:
         _commit(proposed_change[:70])
         _save_best_score(visible_score, hidden_score)
+        hidden_str = "N/A" if hidden_score is None else f"{hidden_score:.2f}"
         _write(opt_journal, f"{journal_existing}- **{date.today().isoformat()}** Kept '{proposed_change[:60]}...' "
-               f"(visible={visible_score:.2f}, hidden={'N/A' if hidden_score is None else f'{hidden_score:.2f}'})\n")
+               f"(visible={visible_score:.2f}, hidden={hidden_str})\n")
         print("Decision: KEEP [yes]")
         print("Committed to git. Best scores updated.")
     else:
         _write(claudemd, original_claude_md)
+        hidden_str = "N/A" if hidden_score is None else f"{hidden_score:.2f}"
         _write(opt_journal, f"{journal_existing}- **{date.today().isoformat()}** Dropped '{proposed_change[:60]}...' "
-               f"(visible={visible_score:.2f}, hidden={'N/A' if hidden_score is None else f'{hidden_score:.2f}'})\n")
+               f"(visible={visible_score:.2f}, hidden={hidden_str})\n")
         print("Decision: DROP [no]")
         print("Restored harness/CLAUDE.md.")
 
